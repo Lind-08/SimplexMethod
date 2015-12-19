@@ -1,11 +1,16 @@
 // SimplexMethod.cpp: определяет точку входа для консольного приложения.
 //
 
+//TODO: Необходимо добавить недостающие комментарии.
+
 #include "stdafx.h"
 #include <vector>
 #include <limits>
 
 using namespace std;
+
+//Объявление типа vec_f равнозначного vector<float> для упрощения записи
+typedef vector<float> vec_f;
 
 
 //Структура для хранения результата нахождения
@@ -14,7 +19,7 @@ struct SimplexResult
 {
 	//Вектор(массив переменной длины), хранящий в себе оптимальные
 	//значения координат исходной функции
-	vector<float> CoordnatesValues; 
+	vec_f CoordnatesValues; 
 	//Оптимальное значение целевой функции
 	float ResultValue;
 	//Логическая переменная, которая равна false, если вычисление прошло успешно,
@@ -29,15 +34,15 @@ struct basisElement
 	float value; //Значение
 };
 
-vector<float> GetCollumn(int number, vector<vector<float> > limitsCoordinates)
+vec_f GetCollumn(int number, vector<vec_f > limitsCoordinates)
 {
-	vector<float> res;
-	for (vector<float> x : limitsCoordinates)
+	vec_f res;
+	for (vec_f x : limitsCoordinates)
 		res.push_back(x[number]);
 	return res;
 }
 
-float CalculateIndex(vector<basisElement> basis, vector<float> coordinates, float value)
+float CalculateIndex(vector<basisElement> basis, vec_f coordinates, float value)
 {
 	float res = 0;
 	for (unsigned int i = 0; i < basis.size(); i++)
@@ -47,17 +52,16 @@ float CalculateIndex(vector<basisElement> basis, vector<float> coordinates, floa
 	return res -= value;
 }
 
-vector<float> CalculateIndexes(vector<basisElement> basis,
-							   vector<float> coordinates,
-							   vector<vector<float> > limitsCoordinates)
+vec_f CalculateIndexes(vector<basisElement> basis, vec_f coordinates,
+								vector<vec_f> limitsCoordinates)
 {
-	vector<float> res;
+	vec_f res;
 	for (unsigned int i = 0; i < coordinates.size(); i++)
 		res.push_back(CalculateIndex(basis, GetCollumn(i, limitsCoordinates), coordinates[i]));
 	return res;
 }
 
-vector<basisElement> CalculateBasis(vector<vector<float> > limitsCoordinates, vector<float> coordinates)
+vector<basisElement> CalculateBasis(vector<vec_f> limitsCoordinates, vec_f coordinates)
 {
 	vector<basisElement> result;
 	for (unsigned int j = 0; j < limitsCoordinates.size(); j++)
@@ -98,7 +102,7 @@ vector<basisElement> CalculateBasis(vector<vector<float> > limitsCoordinates, ve
 	return result;
 }
 
-int FindMax(vector<float> values)
+int FindMax(vec_f values)
 {
 	int index = 0;
 	for (unsigned int i = 0; i < values.size(); i++)
@@ -107,7 +111,7 @@ int FindMax(vector<float> values)
 	return index;
 }
 
-int FindMin(vector<float> values)
+int FindMin(vec_f values)
 {
 	int index = 0;
 	for (unsigned int i = 0; i < values.size(); i++)
@@ -116,7 +120,7 @@ int FindMin(vector<float> values)
 	return index;
 }
 
-int CheckIndexes(vector<float> indexRow, vector<vector<float> > limitsCoordinates)
+int CheckIndexes(vec_f indexRow, vector<vec_f> limitsCoordinates)
 {
 	int res = 0;
 	for (unsigned int i = 0; i < indexRow.size(); i++)
@@ -135,15 +139,23 @@ int CheckIndexes(vector<float> indexRow, vector<vector<float> > limitsCoordinate
 	return res;
 }
 
+vec_f CalculateTeta(vec_f collumn, vec_f result)
+{
+	vec_f res;
+	for (unsigned int i = 0; i < collumn.size(); i++)
+		res.push_back(result[i] / collumn[i]);
+	return res;
+}
+
 
 //Функция нахождения оптимального значения симплекс-методом
 //coordinates - массив коэффициентов при переменных в целевой функции
 //limitationsCoordinates - матрица коэффициентов в ограничениях для вычисления оптимального значения
 //results - массив значений ограничений
 //type - тип задачи (минимум - true, максимум - false) 
-SimplexResult SimplexMethod(vector<float> coordinates,
-							vector<vector<float> > limitsCoordinates,
-							vector<float> results,
+SimplexResult SimplexMethod(vec_f coordinates,
+							vector<vec_f > limitsCoordinates,
+							vec_f results,
 							bool type)
 {
 	SimplexResult res;
@@ -151,7 +163,7 @@ SimplexResult SimplexMethod(vector<float> coordinates,
 	res.ResultValue = 0;
 	//массив, содержащий в себе значения опорного плана
 	//заполнение его нулями по числу координат
-	vector<float> basicPlan(coordinates.size(),0);
+	vec_f basicPlan(coordinates.size(),0);
 
 	//Добавление в опорный план значений ограничений
 	for (float x : results)
@@ -160,7 +172,7 @@ SimplexResult SimplexMethod(vector<float> coordinates,
 	}
 
 	//массив, содержащий значения коэффициентов ограничений вместе с балансными переменными
-	vector<vector<float> > _limitsCoordinates;
+	vector<vec_f > _limitsCoordinates;
 
 	//заполнение симплекс таблицы
 	//добавление балансных переменных и присвоение им значений
@@ -193,7 +205,7 @@ SimplexResult SimplexMethod(vector<float> coordinates,
 
 	//массив, хранящий в себе значения индексной строки
 	//по ней определяются шаги алгоритма и возможность нахождения оптимума
-	vector<float> indexRow = CalculateIndexes(basis, coordinates, limitsCoordinates);
+	vec_f indexRow = CalculateIndexes(basis, coordinates, limitsCoordinates);
 	int probe = CheckIndexes(indexRow, _limitsCoordinates);
 	if (probe == -1)
 	{
@@ -213,7 +225,6 @@ SimplexResult SimplexMethod(vector<float> coordinates,
 	while (true)
 	{
 		int index = type ? FindMax(indexRow) : FindMin(indexRow);
-		
 	}
 }
 
