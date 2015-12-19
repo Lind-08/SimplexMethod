@@ -225,6 +225,7 @@ SimplexResult SimplexMethod(vec_f coordinates,
 	while (true)
 	{
 		int index = type ? FindMax(indexRow) : FindMin(indexRow);
+		//TODO:  Закончить алгоритм.
 	}
 }
 
