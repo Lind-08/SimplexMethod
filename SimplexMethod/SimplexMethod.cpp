@@ -173,32 +173,25 @@ int FindMin(vec_f values)
 int CheckIndexes(vec_f indexRow, vector<vec_f> limitsCoordinates, bool type)
 {
 	int res = 0;
+	//Просматриваем каждый элемент индексной строки
 	for (unsigned int i = 0; i < indexRow.size(); i++)
 	{
+		//Если задача найти минимум
 		if (type)
 		{
+			//Если индексный элемент больше нуля
 			if (indexRow[i] > 0)
 			{
-				res = -1;
-				for (unsigned int j = 0; j < limitsCoordinates.size(); j++)
-				{
-					if (limitsCoordinates[j][i] > 0)
-						res = 1;
-				}
-				break;
+				//План не оптимален, требуется пересмотр
+				res = 1;
 			}
 		}
 		else
 		{
+			//Проверки аналогичны тем, что были сделаны выше, только элементы должны быть положительными
 			if (indexRow[i] < 0)
 			{
-				res = -1;
-				for (unsigned int j = 0; j < limitsCoordinates.size(); j++)
-				{
-					if (limitsCoordinates[j][i] < 0)
-						res = 1;
-				}
-				break;
+				res = 1;
 			}
 		}
 	}
@@ -211,7 +204,7 @@ vec_f CalculateTeta(vec_f collumn, vec_f result)
 {
 	vec_f res;
 	for (unsigned int i = 0; i < collumn.size(); i++)
-		res.push_back(result[i] / collumn[i]);
+		res.push_back(result[i] / abs(collumn[i]));
 	return res;
 }
 
@@ -300,7 +293,7 @@ SimplexResult SimplexMethod(vec_f coordinates,
 	}
 
 	//массив, хранящий в себе значения и номера базисных переменных
-	vector<basisElement> basis = CalculateBasis(_limitsCoordinates, coordinates);
+	vector<basisElement> basis = CalculateBasis(_limitsCoordinates, _coordinates);
 
 	//массив, хранящий в себе значения индексной строки
 	//по ней определяются шаги алгоритма и возможность нахождения оптимума
@@ -330,11 +323,11 @@ SimplexResult SimplexMethod(vec_f coordinates,
 		int index = type ? FindMax(indexRow) : FindMin(indexRow);
 		//Получаем соответствующий столбец
 		vec_f indexCollumn = GetCollumn(index, _limitsCoordinates);
-		//Определяем ведущую строчку по необходимому отношению
-		int indexTeta = type ? FindMin(CalculateTeta(indexCollumn, results)) : FindMax(CalculateTeta(indexCollumn, results));
+		//Определяем ведущую строчку по минимальному значению отношения
+		int indexTeta = FindMin(CalculateTeta(indexCollumn, results));
 		float indexValue = _limitsCoordinates[indexTeta][index];
 		//Делим ведущую строчку на элемент ведущего столбца
-		for (unsigned int i = 0; i < _limitsCoordinates[index].size(); i++)
+		for (unsigned int i = 0; i < _limitsCoordinates[indexTeta].size(); i++)
 		{
 			_limitsCoordinates[indexTeta][i] /= indexValue;
 		}
@@ -396,6 +389,23 @@ int main(int argc,  char* argv[])
 	cout << "Min value = " << result.ResultValue << endl;
 	cout << "Coordinates:" << endl;
 	for (float x : result.CoordnatesValues)
+	{
+		cout << x << " ";
+	}
+	cout << endl;
+	vec_f coord1({ 3, 4 });
+	vector<vec_f> limits1;
+	vec_f test01({ 1, 1});
+	vec_f test11({ 2, 3 });
+	vec_f test21({ 12, 30 });
+	limits1.push_back(test01);
+	limits1.push_back(test11);
+	limits1.push_back(test21);
+	vec_f res1({ 550, 1200, 9600 });
+	SimplexResult result1 = SimplexMethod(coord1, limits1, res1, false);
+	cout << "Max value = " << result1.ResultValue << endl;
+	cout << "Coordinates:" << endl;
+	for (float x : result1.CoordnatesValues)
 	{
 		cout << x << " ";
 	}
