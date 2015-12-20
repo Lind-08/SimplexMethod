@@ -1,6 +1,5 @@
 
 
-#include "stdafx.h"
 #include <vector>
 #include <limits>
 #include <iostream>
@@ -380,7 +379,7 @@ SimplexResult SimplexMethod(vec_f coordinates,
 
 
 
-int _tmain(int argc, _TCHAR* argv[])
+int main(int argc,  char* argv[])
 {
 	//Создаю массивы координат функции, ограничений и их значений
 	vec_f coord({ 10, -7, -5 });
