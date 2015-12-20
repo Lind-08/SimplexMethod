@@ -6,6 +6,7 @@
 #include "stdafx.h"
 #include <vector>
 #include <limits>
+#include <iostream>
 
 using namespace std;
 
@@ -31,68 +32,107 @@ struct SimplexResult
 struct basisElement
 {
 	int number;	//Номер координаты
+	int position; //Позиция в столбце
 	float value; //Значение
 };
 
+//Функция получения столбца матрицы
 vec_f GetCollumn(int number, vector<vec_f > limitsCoordinates)
 {
 	vec_f res;
+	//Range-based for
+	//Цикл перебора элементов коллекции. Поочереди выбирает каждый элемент.
+	//Добавлен в с++11
 	for (vec_f x : limitsCoordinates)
 		res.push_back(x[number]);
 	return res;
 }
 
+//Функция вычисления значения индекса
+//Это скалярное произведение двух матриц минус значение координаты
 float CalculateIndex(vector<basisElement> basis, vec_f coordinates, float value)
 {
 	float res = 0;
 	for (unsigned int i = 0; i < basis.size(); i++)
 	{
-		res += basis[i].value * coordinates[i];
+		//Получение элемента базиса, соответствующее необходимой позиции
+		basisElement z;
+		for (basisElement x: basis)
+			if (x.position == i)
+				z = x;
+		res += z.value * coordinates[i];
 	}
 	return res -= value;
 }
 
+//Функция проверки вхождения номера координаты в базис
+bool InBasis(vector<basisElement> basis, int index)
+{
+	for (basisElement x : basis)
+	{
+		if (x.number == index)
+			return true;
+	}
+	return false;
+}
+
+//Функция вычисления значения  индексной строки
 vec_f CalculateIndexes(vector<basisElement> basis, vec_f coordinates,
 								vector<vec_f> limitsCoordinates)
 {
 	vec_f res;
-	for (unsigned int i = 0; i < coordinates.size(); i++)
-		res.push_back(CalculateIndex(basis, GetCollumn(i, limitsCoordinates), coordinates[i]));
+	for (unsigned int i = 0; i < limitsCoordinates[0].size(); i++)
+		//Если координата не входит в базис,
+		//то вычисляем значение индекса, иначе оно равно нулю
+		if (!InBasis(basis,i))
+			res.push_back(CalculateIndex(basis, GetCollumn(i, limitsCoordinates), coordinates[i]));
+		else res.push_back(0);
 	return res;
 }
 
+
+//Функция вычисления базиса
+//Проверяется вся симплекс матрица и в те координаты, в столбцах которых есть только одна единица,
+//заносятся в базис
 vector<basisElement> CalculateBasis(vector<vec_f> limitsCoordinates, vec_f coordinates)
 {
 	vector<basisElement> result;
-	for (unsigned int j = 0; j < limitsCoordinates.size(); j++)
+	for (unsigned int j = 0; j < limitsCoordinates[0].size(); j++)
 	{
+		//Вспомогательные переменные номера координаты, позиции и значения
 		int number;
+		int position;
 		float value;
+		//Указывает, является ли данный столбец базисной координатой
 		bool isBasis = true;
-		for (unsigned int i = 0; i < limitsCoordinates[i].size(); i++)
+		for (unsigned int i = 0; i < limitsCoordinates.size(); i++)
 		{
+			//Если это не ноль, то проверяем дальше
 			if (limitsCoordinates[i][j])
 			{
-				if (limitsCoordinates[i][j] != 0 && limitsCoordinates[i][j] != 1)
+				//Если имеется любое значение, кроме единицы, то это точно не базисная координата
+				if (limitsCoordinates[i][j] != 1)
 				{
 					isBasis = false;
 					break;
 				}
 				else 
 				{
+					//иначе сохраняем номер, значение и позицию
 					number = j;
-					if (j > coordinates.size())
-						value = 0;
-					else
-						value = coordinates[j];
+					position = i;
+					value = coordinates[j];
 				}
 			}
 		}
+		//если координата базисная
 		if (isBasis)
 		{
+			//то добавим ее в базис
 			basisElement be;
 			be.number = number;
 			be.value = value;
+			be.position = position;
 			result.push_back(be);
 		}
 		else
@@ -102,48 +142,106 @@ vector<basisElement> CalculateBasis(vector<vec_f> limitsCoordinates, vec_f coord
 	return result;
 }
 
+//Следующие функции возвращают индекс искомого элемента
+
+//Функция нахождения максимума
 int FindMax(vec_f values)
 {
 	int index = 0;
 	for (unsigned int i = 0; i < values.size(); i++)
-		if (values[index] > values[i])
+		if (values[i] > values[index])
 			index = i;
 	return index;
 }
 
+//Функция нахождения минимума
 int FindMin(vec_f values)
 {
 	int index = 0;
 	for (unsigned int i = 0; i < values.size(); i++)
-	if (values[index] < values[i])
+		//так как, если занчение ограничения равно 0, то данная строка не учитывается, 
+		//то необходимо добавить проверку на это
+	if (values[i] < values[index] && values[i] != 0)
 		index = i;
 	return index;
 }
 
-int CheckIndexes(vec_f indexRow, vector<vec_f> limitsCoordinates)
+//Функция проверки индексной строки
+//Возможны три случая [минимум(максимум)]: 
+//1) все оценки в индексной строке неположительны(положительны) - значит полученный план оптимален;
+//2) среди оценок есть хотя бы одна положительная(отрицательная), и в столбце над ней есть хотя бы один
+//положительный(отрицательный) коэффициент - план неоптимален, возможно его улучшение;
+//3) среди оценок есть хотя бы одна положительная(отрицательная), и в столбце над ней нет ни одного положительного(отрицательного)
+//коэффициента - целевая функция не ограничена сверху(снизу), оптимального плана не существует.
+
+int CheckIndexes(vec_f indexRow, vector<vec_f> limitsCoordinates, bool type)
 {
 	int res = 0;
 	for (unsigned int i = 0; i < indexRow.size(); i++)
 	{
-		if (indexRow[i] > 0)
+		if (type)
 		{
-			res = -1;
-			for (unsigned int j = 0; j < limitsCoordinates.size(); j++)
+			if (indexRow[i] > 0)
 			{
-				if (limitsCoordinates[j][i] > 0)
-					res = 1;
+				res = -1;
+				for (unsigned int j = 0; j < limitsCoordinates.size(); j++)
+				{
+					if (limitsCoordinates[j][i] > 0)
+						res = 1;
+				}
+				break;
 			}
-			break;
+		}
+		else
+		{
+			if (indexRow[i] < 0)
+			{
+				res = -1;
+				for (unsigned int j = 0; j < limitsCoordinates.size(); j++)
+				{
+					if (limitsCoordinates[j][i] < 0)
+						res = 1;
+				}
+				break;
+			}
 		}
 	}
 	return res;
 }
 
+//Вычисление отношения значения ограничения деленного на элемент 
+//столбца, соотв. максимальному(минимальному) значению индексной строки
 vec_f CalculateTeta(vec_f collumn, vec_f result)
 {
 	vec_f res;
 	for (unsigned int i = 0; i < collumn.size(); i++)
 		res.push_back(result[i] / collumn[i]);
+	return res;
+}
+
+
+//Функция нахождения базового плана
+vec_f CalculateBasicPlan(vector<vec_f > limitsCoordinates, vector<basisElement> basis, vec_f results)
+{
+	//Заполняем его нулями
+	vec_f res(limitsCoordinates[0].size(),0);
+	for (basisElement x : basis)
+	{
+		//На место базисных переменных ставим значения соответствующх по позиции ограничений
+		res[x.number] = results[x.position];
+	}
+	return res;
+}
+
+
+//Функция вычисления значения целевой функции
+float CalculateFunction(vec_f coordinates, vec_f basicPlan)
+{
+	float res = 0;
+	for (unsigned int i = 0; i < coordinates.size(); i++)
+	{
+		res += coordinates[i] * basicPlan[i];
+	}
 	return res;
 }
 
@@ -171,6 +269,10 @@ SimplexResult SimplexMethod(vec_f coordinates,
 		basicPlan.push_back(x);
 	}
 
+	vec_f _coordinates(coordinates);
+	for (unsigned i = 0; i < limitsCoordinates.size(); i++)
+		_coordinates.push_back(0);
+
 	//массив, содержащий значения коэффициентов ограничений вместе с балансными переменными
 	vector<vec_f > _limitsCoordinates;
 
@@ -186,6 +288,7 @@ SimplexResult SimplexMethod(vec_f coordinates,
 	*/
 	for (unsigned int i = 0; i < limitsCoordinates.size(); i++)
 	{
+		_limitsCoordinates.push_back(vec_f());
 		for (unsigned int j = 0; j < limitsCoordinates[i].size(); j++)
 		{
 			_limitsCoordinates[i].push_back(limitsCoordinates[i][j]);
@@ -205,27 +308,75 @@ SimplexResult SimplexMethod(vec_f coordinates,
 
 	//массив, хранящий в себе значения индексной строки
 	//по ней определяются шаги алгоритма и возможность нахождения оптимума
-	vec_f indexRow = CalculateIndexes(basis, coordinates, limitsCoordinates);
-	int probe = CheckIndexes(indexRow, _limitsCoordinates);
+	vec_f indexRow = CalculateIndexes(basis, _coordinates, _limitsCoordinates);
+	//Проверяем индексную строку
+	int probe = CheckIndexes(indexRow, _limitsCoordinates,type);
+	//Если -1, то решение найти невозможно
 	if (probe == -1)
 	{
 		res.IsError = true;
 		return res;
 	}
 	else 
+		//если ноль, то план уже оптимален
 	if (probe == 0)
 	{
 		res.CoordnatesValues = basicPlan;
-		for (unsigned int i = 0; i < coordinates.size(); i++)
-		{
-			res.ResultValue += coordinates[i] * basicPlan[i];
-		}
+		res.ResultValue = CalculateFunction(_coordinates, basicPlan);
 		return res;
 	}
 	while (true)
 	{
+		//Находим необходимый элемент индексной строки
+		//Используется тернарный оператор
+		//он действует так 
+		//если type = true, то выполняется FindMax, иначе FindMin 
 		int index = type ? FindMax(indexRow) : FindMin(indexRow);
-		//TODO:  Закончить алгоритм.
+		//Получаем соответствующий столбец
+		vec_f indexCollumn = GetCollumn(index, _limitsCoordinates);
+		//Определяем ведущую строчку по необходимому отношению
+		int indexTeta = type ? FindMin(CalculateTeta(indexCollumn, results)) : FindMax(CalculateTeta(indexCollumn, results));
+		float indexValue = _limitsCoordinates[indexTeta][index];
+		//Делим ведущую строчку на элемент ведущего столбца
+		for (unsigned int i = 0; i < _limitsCoordinates[index].size(); i++)
+		{
+			_limitsCoordinates[indexTeta][i] /= indexValue;
+		}
+		//и делим значение ограничения
+		results[indexTeta] /= indexValue;
+		
+		//Сложение строк с ведущей строкой
+		for (unsigned int i = 0; i < _limitsCoordinates.size(); i++)
+		{
+			if (i != indexTeta)
+			{
+				for (unsigned int j = 0; j < _limitsCoordinates[i].size(); j++)
+				{
+					_limitsCoordinates[i][j] += _limitsCoordinates[indexTeta][j] * (-indexCollumn[i]);
+				}
+				results[i] += results[indexTeta] * (-indexCollumn[i]);
+			}
+		}
+
+		//Действия аналогичны тем, что мы делали ранее
+		basis = CalculateBasis(_limitsCoordinates, _coordinates);
+
+		basicPlan = CalculateBasicPlan(_limitsCoordinates, basis, results);
+
+		indexRow = CalculateIndexes(basis, _coordinates, _limitsCoordinates);
+		probe = CheckIndexes(indexRow, _limitsCoordinates,type);
+		if (probe == -1)
+		{
+			res.IsError = true;
+			return res;
+		}
+		else
+		if (probe == 0)
+		{
+			res.CoordnatesValues = basicPlan;
+			res.ResultValue = CalculateFunction(coordinates, basicPlan);
+			return res;
+		}
 	}
 }
 
@@ -234,6 +385,26 @@ SimplexResult SimplexMethod(vec_f coordinates,
 
 int _tmain(int argc, _TCHAR* argv[])
 {
+	//Создаю массивы координат функции, ограничений и их значений
+	vec_f coord({ 10, -7, -5 });
+	vector<vec_f> _limits;
+	vec_f test0({ 6, 15, 6 });
+	vec_f test1({ 14, 42, 16 });
+	vec_f test2({ 2, 8, 2 });
+	_limits.push_back(test0);
+	_limits.push_back(test1);
+	_limits.push_back(test2);
+	vec_f res({ 9, 21, 4 });
+	//Вычисляю результат
+	SimplexResult result = SimplexMethod(coord, _limits, res, true);
+	cout << "Min value = " << result.ResultValue << endl;
+	cout << "Coordinates:" << endl;
+	for (float x : result.CoordnatesValues)
+	{
+		cout << x << " ";
+	}
+	cout << endl;
+	system("pause");
 	return 0;
 }
 
