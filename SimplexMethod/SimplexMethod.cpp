@@ -1,8 +1,9 @@
 
-#include <cmath>
+#include <math.h>
 #include <vector>
 #include <limits>
 #include <iostream>
+#include <stdlib.h>
 
 using namespace std;
 
