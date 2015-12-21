@@ -1,5 +1,5 @@
 
-
+#include <cmath>
 #include <vector>
 #include <limits>
 #include <iostream>
@@ -204,7 +204,7 @@ vec_f CalculateTeta(vec_f collumn, vec_f result)
 {
 	vec_f res;
 	for (unsigned int i = 0; i < collumn.size(); i++)
-		res.push_back(result[i] / abs(collumn[i]));
+		res.push_back(result[i] / fabs(collumn[i]));
 	return res;
 }
 
